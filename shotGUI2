@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+#####################################################################
+#			Version: 1.0.0
+#####################################################################
+#
+#
+#
+SHOTVIDEO(){
+	
+if [ -z "$VIDEOFILE" ]; then
+	Xdialog --title " " --msgbox "$(gettext 'Не выбран видеофайл!')" 0 0  
+	exit 1
+fi 
+if [ "$NUMBER" == "" ]; then NUMBER=12; fi
+#if [ "$PERCENTAGE" == "" ]; then PERCENTAGE=35; fi	
+if [ "$FOLDER" == "" ]; then FOLDER=`dirname "$VIDEOFILE"`; fi		
+
+mkdir /tmp/shots
+
+file_path=$VIDEOFILE
+folder_ext=${file_path##*/}
+folder_ext=`echo "$folder_ext" | sed '$s/....$//'`
+shots_number=$NUMBER
+tmp="/tmp/shots/info"
+inf=`mplayer "$file_path" -identify -frames 1 -ao null -vo null 2>/dev/null | tee $tmp`
+length=`cat $tmp | grep LENGTH | sed -e 's/^.*=//' -e 's/[.].*//'`
+shot_time=`echo $[$length/$shots_number/60]`
+
+# Making screenshots...
+for i in `seq 1 $shots_number`;
+do
+  randomiser=$RANDOM; let "randomiser %= 25"
+  hop=`echo $[$shot_time*60*$i+$randomiser]`
+  mplayer -ss $hop -noautosub -frames 1 -ao null -vo png "$file_path" &> /dev/null
+  mv 00000001.png /tmp/shots/$i.png &> /dev/null
+done
+rm /tmp/shots/info
+mkdir "$FOLDER"/"$folder_ext"
+mv /tmp/shots/* "$FOLDER"/"$folder_ext" &> /dev/null
+rmdir /tmp/shots
+}
+export -f SHOTVIDEO
+
+export PROG='
+<window title="Видео скриншот 1.0.0">
+<vbox>
+  <hbox>
+	  <frame Видео скриншот>
+        <text xalign="0">
+          <label>GUI для снятия скритшотов с видеофайлов скриптом shot, использующего библиотеку mplayer. Скриншоты сохраняются в одноимённом подкаталоге каталога видеофайла.</label>
+        </text>
+	  </frame>
+	  </hbox>
+	  <hbox> 
+	  <frame Выберите файл>
+        <hbox>
+          <entry accept="filename"><variable>VIDEOFILE</variable></entry>
+          <button>
+            <input file stock="gtk-open"></input>
+            <action type="fileselect">VIDEOFILE</action>
+          </button>
+        </hbox>
+	  </frame> 
+	  </hbox>
+	  <frame Количество кадров>
+        <hbox>
+          <entry>
+            <variable>NUMBER</variable>
+            <default>12</default>
+          </entry>
+        </hbox>   
+      </frame>
+	  <hbox> 
+		<button>
+			<label>Создать</label>
+			<action>SHOTVIDEO</action>
+			<action>Clear:VIDEOFILE</action>
+		</button>
+		<button>
+			<label>Выход</label>
+		</button>
+  </hbox>
+ </vbox>
+</window>
+'
+
+gtkdialog3 --program PROG > /dev/null
